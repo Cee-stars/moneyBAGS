@@ -1,26 +1,72 @@
 @import "tailwindcss";
 
+/*
+  iPhone 専用。フォントは端末内蔵の Hiragino Sans を使う。
+  Google Fonts を読まないので通信ゼロ、オフラインでも字が崩れない。
+
+  色は docs/PLAN.md の決定に従う。ダークモードは作らない。
+  純白の背景と純黒の文字は使わない（感覚負荷を避けるため）。
+*/
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #f2f4f5;
+  --surface: #fdfdfc;
+  --border: #dde3e6;
+  --border-soft: #edf1f2;
+  --ink: #19222a;
+  --ink-2: #40505a;
+  --ink-3: #5a6872;
+
+  --accent: #1f6b7a;
+  --accent-ink: #164e59;
+  --accent-bg: #e4eef0;
+
+  --attention-ink: #8a4f00;
+  --attention-bg: #fbf0e0;
+  --attention-edge: #e3d3b6;
+
+  /* 欲しいものを見分けるための6色。検証済み（docs/PLAN.md §4.4） */
+  --item-1: #2b6cb0;
+  --item-2: #a84e1c;
+  --item-3: #00806a;
+  --item-4: #8f6b00;
+  --item-5: #6e4fc4;
+  --item-6: #b3436e;
+
+  --font-ja: -apple-system, "Hiragino Sans", "Hiragino Kaku Gothic ProN",
+    system-ui, sans-serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  /* iOS で勝手に文字サイズを変えられないようにする（ユーザーの拡大は妨げない） */
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ja);
+  /* 金額を桁で揃える */
+  font-feature-settings: "tnum";
+  /* ホームバーやノッチを避ける */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* 動きを減らす設定を尊重する。アニメーションは既定でも足さない方針。 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* タップ領域は 44px 以上。長押しの青いハイライトは消す。 */
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
 }

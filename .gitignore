@@ -48,3 +48,6 @@ next-env.d.ts
 *.sqlite
 *.sqlite3
 /data/
+
+# static export output
+/out/
