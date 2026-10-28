@@ -34,8 +34,21 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="ja">
-      <body>{children}</body>
+    <html lang="ja" suppressHydrationWarning>
+      <body>
+        {/*
+          保存された文字サイズを最初の描画前に当てる。
+          これがないと一瞬だけ標準サイズで出てから切り替わる。
+          localStorage は private モードなどで例外を投げうるので必ず try で囲む。
+        */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              'try{var t=localStorage.getItem("mb.textSize");if(t==="large"||t==="xlarge"){document.documentElement.dataset.text=t}}catch(e){}',
+          }}
+        />
+        {children}
+      </body>
     </html>
   );
 }

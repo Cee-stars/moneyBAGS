@@ -70,3 +70,42 @@ button,
 a {
   -webkit-tap-highlight-color: transparent;
 }
+
+/*
+  文字の大きさ: 3段階の1つのつまみ（標準 / 大きい / もっと大きい）。
+
+  ・スライダーにしない。無段階だと調整そのものが終わらない作業になる。
+  ・サイズと行間を別のつまみにしない。大きくすると行間も一緒に広がる。
+  ・全部この1つの倍率で動く。個別のpx指定を残すと、大きくしたとき
+    一部だけ取り残されて逆に読みにくくなる。
+  詳細は docs/PLAN.md §4.8
+*/
+:root {
+  --scale: 1;
+  --lh-body: 1.85;
+  --lh-tight: 1.4;
+
+  --fs-note: calc(0.75rem * var(--scale)); /* 12px 補助 */
+  --fs-sub: calc(0.8125rem * var(--scale)); /* 13px 副文 */
+  --fs-body: calc(0.875rem * var(--scale)); /* 14px 本文 */
+  --fs-read: calc(0.9375rem * var(--scale)); /* 15px 読ませる文 */
+  --fs-item: calc(1rem * var(--scale)); /* 16px 項目名 */
+  --fs-head: calc(1.1875rem * var(--scale)); /* 19px 画面見出し */
+  --fs-title: calc(1.625rem * var(--scale)); /* 26px 題 */
+  --fs-money: calc(2.25rem * var(--scale)); /* 36px 金額 */
+}
+
+:root[data-text="large"] {
+  --scale: 1.15;
+  --lh-body: 1.95;
+}
+
+:root[data-text="xlarge"] {
+  --scale: 1.3;
+  --lh-body: 2.05;
+}
+
+body {
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}

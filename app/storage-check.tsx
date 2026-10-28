@@ -54,8 +54,8 @@ export default function StorageCheck() {
     display: "flex",
     justifyContent: "space-between",
     gap: 12,
-    fontSize: 14,
-    lineHeight: 1.9,
+    fontSize: "var(--fs-body)",
+    lineHeight: "var(--lh-body)",
   };
 
   return (
@@ -67,12 +67,12 @@ export default function StorageCheck() {
         padding: 16,
       }}
     >
-      <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8 }}>
+      <div style={{ fontSize: "var(--fs-item)", fontWeight: 700, marginBottom: 8 }}>
         この端末のデータ保存の状態
       </div>
 
       {!state.supported ? (
-        <div style={{ fontSize: 14, lineHeight: 1.85, color: "var(--ink-3)" }}>
+        <div style={{ fontSize: "var(--fs-body)", lineHeight: "var(--lh-body)", color: "var(--ink-3)" }}>
           このブラウザは保存状態を確認できません。
         </div>
       ) : (
@@ -101,7 +101,7 @@ export default function StorageCheck() {
           marginTop: 12,
           paddingTop: 10,
           borderTop: "1px solid var(--border-soft)",
-          fontSize: 12,
+          fontSize: "var(--fs-note)",
           lineHeight: 1.75,
           color: "var(--ink-3)",
         }}
