@@ -31,12 +31,12 @@ jobs:
       # output: "export" なので out/ に静的ファイルが書き出される
       - run: npm run build
 
-      # enablement: true で Pages 自体を API 経由で有効化する。
-      # これがないと、リポジトリの Settings → Pages を手で
-      # 「GitHub Actions」に切り替えるまでデプロイできない。
+      # 前提: リポジトリの Settings → Pages → Source が「GitHub Actions」に
+      # なっていること。なっていないとこのステップが Not Found で失敗する。
+      # enablement: true での自動有効化は試したが、ワークフローの標準トークンには
+      # Pages サイトの作成権限がなく "Resource not accessible by integration" で
+      # 失敗する。この1回だけは人が設定する必要がある。
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:
