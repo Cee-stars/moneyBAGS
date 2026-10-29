@@ -1,129 +1,239 @@
-import StorageCheck from "./storage-check";
-import TextSize from "./text-size";
+"use client";
 
-/*
-  下準備の段階。アプリの機能はまだ入っていない。
-  画面設計のプレビュー: https://claude.ai/artifact/B3o8PePPcKaho1aJKQqMfJ
-  計画: docs/PLAN.md
-*/
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { getSetting, getTxnsBetween, isAvailable, requestPersistence, type Txn } from "@/lib/db";
+import { formatAmount, money, sumMoney } from "@/lib/money";
+import { daysInMonth, monthRange, parseISODate, todayISO } from "@/lib/recurrence";
 
-const done = [
-  "サーバーを持たない形（静的書き出し）に設定",
-  "GitHub Pages へ自動デプロイする設定",
-  "ホーム画面に追加できる設定（アイコン・単独ウィンドウ）",
-  "iPhone 内蔵フォントを使う設定（通信ゼロ）",
-  "色の定義（欲しいもの用の6色を含む）",
-  "文字の大きさ3段階（下のカード）",
-  "保存状態を確認する仕組み（一番下のカード）",
-];
+const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+const BACKUP_REMINDER_DAYS = 7;
 
-const next = [
-  "支出を記録する（金額だけ必須・「あとで分類する」も選べる）",
-  "今月の残りを出す",
-  "バックアップの書き出しと読み込み",
-  "サブスク（年額を主役に、累計と件数も出す）",
-  "サブスクの確認サイクル（続ける／解約を検討する・解約ページへのリンク）",
-  "欲しいもの（あといくら・写真・買う理由と買わない理由）",
-  "「今日はこれで終わり」で閉じられる画面",
-];
-
-const card: React.CSSProperties = {
-  background: "var(--surface)",
-  border: "1px solid var(--border)",
-  borderRadius: 14,
-  padding: 16,
-};
-
-const h2: React.CSSProperties = {
-  margin: "0 0 10px",
-  fontSize: "var(--fs-item)",
-  fontWeight: 700,
-};
-
-const list: React.CSSProperties = {
-  margin: 0,
-  paddingLeft: "1.3em",
-  fontSize: "var(--fs-body)",
-  lineHeight: "var(--lh-body)",
+type Loaded = {
+  txns: Txn[];
+  budgetMinor: number | null;
+  lastBackupAt: string | null;
 };
 
 export default function Home() {
+  const [state, setState] = useState<Loaded | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isAvailable()) {
+      setFailed("このブラウザではデータを保存できません。");
+      return;
+    }
+    let cancelled = false;
+
+    (async () => {
+      try {
+        // 毎回要求する。Safari は利用履歴から自動で許可/不許可を決める。
+        await requestPersistence();
+        const { start, end } = monthRange(todayISO());
+        const [txns, budgetMinor, lastBackupAt] = await Promise.all([
+          getTxnsBetween(start, end),
+          getSetting<number | null>("budgetMinor", null),
+          getSetting<string | null>("lastBackupAt", null),
+        ]);
+        if (!cancelled) setState({ txns, budgetMinor, lastBackupAt });
+      } catch {
+        if (!cancelled) setFailed("保存されたデータを読み込めませんでした。");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const today = todayISO();
+  const { y, m, d } = parseISODate(today);
+  const total = daysInMonth(y, m);
+  const daysLeft = total - d + 1;
+  const weekday = WEEKDAYS[new Date(y, m - 1, d).getDay()];
+
   return (
-    <main
-      style={{
-        maxWidth: 430,
-        margin: "0 auto",
-        padding: "20px 20px 40px",
-        display: "flex",
-        flexDirection: "column",
-        gap: 16,
-      }}
-    >
-      <header>
-        <h1
-          style={{
-            margin: 0,
-            fontSize: "var(--fs-title)",
-            fontWeight: 700,
-            letterSpacing: "-0.01em",
-            lineHeight: "var(--lh-tight)",
-          }}
-        >
-          moneyBAGS
+    <main className="wrap">
+      <header className="between">
+        <h1 className="h1">
+          {m}月{d}日（{weekday}）
         </h1>
-        <p
-          style={{
-            margin: "6px 0 0",
-            fontSize: "var(--fs-body)",
-            lineHeight: "var(--lh-body)",
-            color: "var(--ink-3)",
-          }}
-        >
-          下準備だけ終わった状態です。機能はまだ入っていません。
-        </p>
+        <span className="sub">今月あと{daysLeft}日</span>
       </header>
 
-      <section style={card}>
-        <h2 style={h2}>できていること</h2>
-        <ul style={list}>
-          {done.map((t) => (
-            <li key={t}>{t}</li>
-          ))}
-        </ul>
-      </section>
+      {failed !== null && (
+        <section className="card attention">
+          <h2 className="h2">読み込めませんでした</h2>
+          <p style={{ fontSize: "var(--fs-body)", lineHeight: "var(--lh-body)" }}>{failed}</p>
+        </section>
+      )}
 
-      <section style={card}>
-        <h2 style={h2}>これから作るもの</h2>
-        <ol style={list}>
-          {next.map((t) => (
-            <li key={t}>{t}</li>
-          ))}
-        </ol>
-      </section>
+      {failed === null && state === null && (
+        <section className="card">
+          <p className="sub">読み込んでいます…</p>
+        </section>
+      )}
 
-      <section
-        style={{
-          ...card,
-          background: "var(--attention-bg)",
-          border: "1px solid var(--attention-edge)",
-          color: "var(--attention-ink)",
-        }}
-      >
-        <h2 style={h2}>iPhone でアプリとして使うには</h2>
-        <p
-          style={{
-            margin: 0,
-            fontSize: "var(--fs-body)",
-            lineHeight: "var(--lh-body)",
-          }}
-        >
-          Safari でこのページを開き、下の共有ボタンから「ホーム画面に追加」を選んでください。iPhone
-          は自分からは追加をすすめてこないので、手で行う必要があります。
+      {state !== null && (
+        <>
+          <Budget state={state} day={d} total={total} daysLeft={daysLeft} month={m} />
+          <Link href="/add/" className="btn primary">
+            支出を記録する
+          </Link>
+          <BackupStatus lastBackupAt={state.lastBackupAt} />
+          <Link href="/settings/" className="link" style={{ textAlign: "center" }}>
+            設定とバックアップ
+          </Link>
+        </>
+      )}
+    </main>
+  );
+}
+
+function Budget({
+  state,
+  day,
+  total,
+  daysLeft,
+  month,
+}: {
+  state: Loaded;
+  day: number;
+  total: number;
+  daysLeft: number;
+  month: number;
+}) {
+  const spent = sumMoney(state.txns.map((t) => money(t.amountMinor, "JPY")));
+  const recordedDays = new Set(state.txns.map((t) => t.date)).size;
+  const uncategorized = state.txns.filter((t) => t.categoryId === null).length;
+
+  if (state.budgetMinor === null) {
+    return (
+      <>
+        <section className="card attention">
+          <h2 className="h2">まず今月の予算を決めてください</h2>
+          <p style={{ fontSize: "var(--fs-body)", lineHeight: "var(--lh-body)" }}>
+            予算を決めると「今月あといくら使えるか」が出ます。あとから変えられます。
+          </p>
+          <div className="divider">
+            <Link href="/settings/" className="btn">
+              予算を決める
+            </Link>
+          </div>
+        </section>
+        <Recorded month={month} day={day} recordedDays={recordedDays} spent={spent.amountMinor} uncategorized={uncategorized} />
+      </>
+    );
+  }
+
+  const remaining = state.budgetMinor - spent.amountMinor;
+  const over = remaining < 0;
+  const ratio = Math.min(1, Math.max(0, spent.amountMinor / state.budgetMinor));
+  const perDay = daysLeft > 0 ? Math.floor(remaining / daysLeft) : remaining;
+
+  return (
+    <>
+      <section className="card">
+        <p className="sub">{over ? "今月の予算を超えた分" : "今月あと使えるお金"}</p>
+        <p className="money">{formatAmount(money(Math.abs(remaining)))}</p>
+
+        <div className="between" style={{ margin: "14px 0 8px", alignItems: "center" }}>
+          <div className="bar" style={{ flex: "1 1 auto" }}>
+            <span style={{ width: `${ratio * 100}%` }} />
+          </div>
+          <span style={{ fontSize: "var(--fs-sub)", fontWeight: 700, color: "var(--ink-2)" }}>
+            {Math.round(ratio * 100)}%
+          </span>
+        </div>
+
+        <p className="sub" style={{ lineHeight: 1.8 }}>
+          予算 {formatAmount(money(state.budgetMinor))} のうち{" "}
+          {formatAmount(spent)} を使いました
+          <br />
+          {over
+            ? "今月はあと使える分がありません。"
+            : `1日あたり あと ${formatAmount(money(Math.max(0, perDay)))} まで`}
         </p>
       </section>
+      <Recorded month={month} day={day} recordedDays={recordedDays} spent={spent.amountMinor} uncategorized={uncategorized} />
+    </>
+  );
+}
 
-      <TextSize />
-      <StorageCheck />
-    </main>
+/*
+  記録の状況を正直に出す。完全であるフリをしない（docs/PLAN.md §4.3）。
+  そして記録していない日があっても催促しない。
+*/
+function Recorded({
+  month,
+  day,
+  recordedDays,
+  spent,
+  uncategorized,
+}: {
+  month: number;
+  day: number;
+  recordedDays: number;
+  spent: number;
+  uncategorized: number;
+}) {
+  return (
+    <section className="card">
+      <h2 className="h2">記録の状況</h2>
+      <p style={{ fontSize: "var(--fs-body)", lineHeight: "var(--lh-body)" }}>
+        {month}月の{day}日のうち、記録があるのは <b>{recordedDays}日</b> です。
+      </p>
+      {recordedDays < day && spent > 0 && (
+        <p className="note" style={{ marginTop: 8 }}>
+          記録がない日の支出は0として数えています。実際の残りはもう少し少ないかもしれません。
+        </p>
+      )}
+      {uncategorized > 0 && (
+        <p className="note" style={{ marginTop: 8 }}>
+          分類をあとで決める記録が {uncategorized}件 あります。そのままでも合計は正しく出ます。
+        </p>
+      )}
+    </section>
+  );
+}
+
+function BackupStatus({ lastBackupAt }: { lastBackupAt: string | null }) {
+  if (lastBackupAt === null) {
+    return (
+      <section className="card attention">
+        <h2 className="h2">まだバックアップを書き出していません</h2>
+        <p style={{ fontSize: "var(--fs-body)", lineHeight: "var(--lh-body)" }}>
+          記録はこの端末の中だけにあります。iPhone
+          はしばらく使わないと保存データを消すことがあります。
+        </p>
+        <div className="divider">
+          <Link href="/settings/" className="btn">
+            バックアップを書き出す
+          </Link>
+        </div>
+      </section>
+    );
+  }
+
+  const last = new Date(lastBackupAt);
+  const days = Math.floor((Date.now() - last.getTime()) / 86400000);
+  const stale = days >= BACKUP_REMINDER_DAYS;
+
+  return (
+    <section className={stale ? "card attention" : "card"}>
+      <h2 className="h2">バックアップ</h2>
+      <p style={{ fontSize: "var(--fs-body)", lineHeight: "var(--lh-body)" }}>
+        最後に書き出したのは {last.getFullYear()}年{last.getMonth() + 1}月{last.getDate()}日
+        （{days === 0 ? "今日" : `${days}日前`}）です。
+      </p>
+      {stale && (
+        <div className="divider">
+          <Link href="/settings/" className="btn">
+            書き出す
+          </Link>
+        </div>
+      )}
+    </section>
   );
 }
