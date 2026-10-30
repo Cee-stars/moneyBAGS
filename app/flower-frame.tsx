@@ -54,7 +54,7 @@ const PALETTES: Record<FlowerPalette, Pal> = {
     vine: "#b4c0b6",
   },
   warm: {
-    petals: ["#c8a596", "#cbb792", "#c3a0a3", "#bdac8f"],
+    petals: ["#c49a88", "#c6b183", "#bf989c", "#b5a788"],
     core: "#dccfae",
     leaf: "#aab59c",
     vine: "#bcc0ad",
