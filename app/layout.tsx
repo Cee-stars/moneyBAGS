@@ -16,7 +16,9 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: `${basePath}/icon-192.png`,
-    apple: `${basePath}/icon-192.png`,
+    // ホーム画面に追加したときのアイコン。iOS が使うのは 180px なので、
+    // 192 を縮めさせずにその大きさで渡す。
+    apple: `${basePath}/icon-180.png`,
   },
 };
 
