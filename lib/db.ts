@@ -114,6 +114,12 @@ export const putTxn = (t: Txn) => run(STORE.txn, "readwrite", (s) => s.put(t));
 export const deleteTxn = (id: string) => run(STORE.txn, "readwrite", (s) => s.delete(id));
 export const getAllTxns = () => run<Txn[]>(STORE.txn, "readonly", (s) => s.getAll());
 
+/** 1件だけ読む。記録を直す画面で使う。無ければ null。 */
+export async function getTxn(id: string): Promise<Txn | null> {
+  const t = await run<Txn | undefined>(STORE.txn, "readonly", (s) => s.get(id));
+  return t ?? null;
+}
+
 /** 指定した期間の取引。索引を使うので全件走査しない。 */
 export function getTxnsBetween(start: string, end: string): Promise<Txn[]> {
   return openDB().then(

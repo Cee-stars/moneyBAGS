@@ -51,3 +51,6 @@ next-env.d.ts
 
 # static export output
 /out/
+
+# 確認用の画面写真（テストが書き出す）
+/.shots/

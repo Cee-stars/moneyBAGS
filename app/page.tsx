@@ -81,6 +81,9 @@ export default function Home() {
           <Link href="/add/" className="btn primary">
             支出を記録する
           </Link>
+          <Link href="/history/" className="btn">
+            記録を見る
+          </Link>
           <BackupStatus lastBackupAt={state.lastBackupAt} />
           <Link href="/settings/" className="link" style={{ textAlign: "center" }}>
             設定とバックアップ
