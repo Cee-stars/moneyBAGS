@@ -291,8 +291,10 @@ Gourville (1998) *JCR* の "pennies-a-day" — 一括費用を小さな定期額
 実装側で決めること:
 
 - **画像は IndexedDB に Blob で持つ。** サーバーがないので置き場所は端末内だけ。**写真はバックアップを本体と別ファイルにする**（JSONが重くなるため・§3.2）
-- **変換はブラウザ側でやる。** サーバーがないので他に選択肢がない。`canvas` で WebP か JPEG に縮小・変換して保存する。**原寸は保存しない**（端末の容量は有限で、iOSのストレージ上限も読めないため）
-- **iPhone から来るのは HEIC。** ただし iPhone 専用かつ Safari なら `canvas` でデコードできる見込みが高い。**実機で確認してから** 必要なら libheif の WebAssembly 版をフォールバックに積む（先に積むと数百KB無駄になる）
+- **変換はブラウザ側でやる。** サーバーがないので他に選択肢がない。`canvas` で **JPEG** に縮小・変換して保存する。**原寸は保存しない**
+- **HEIC のデコーダは積まない。**（2026-10-30 調査で判明）WebKit のソース（`WKFileUploadPanel.mm` と `UnifiedWebPreferences.yaml`）を読むと、内部設定 `PhotoPickerPrefersOriginalImageFormat` の既定値が `false` なので、**フォトライブラリから選んだ写真は `accept` の値に関係なく必ず JPEG に変換されて渡る**。デコーダ（libheif の wasm で約500KB gzip）を積むのは無駄。`createImageBitmap` が失敗したときだけ案内を出す
+- **`accept` に `image/heic` を書いてはいけない。** Safari 17以降で、書くと **JPEG を選んだのに `.heic` として渡ってくる**という逆変換のバグがある（Apple Developer Forums に報告あり、公式回答なし）。`accept="image/*"` だけにする
+- **「ファイルを選択」経由では HEIC が素で届く。** フォトライブラリ経由とは挙動が違うので、HEIC を完全に無視する実装は壊れる
 - **EXIF の回転情報を適用して焼き込む。** しないと横向きで表示される
 - **EXIF の位置情報は捨てる。** 家で撮った写真に自宅の座標が入る。ブラウザで再描画すれば EXIF ごと落ちるので、変換が実質そのまま対策になる
 - サムネイル（160px 程度）と表示用（800px 程度）の2枚を持つ
@@ -444,6 +446,24 @@ Gourville (1998) *JCR* の "pennies-a-day" — 一括費用を小さな定期額
 - 覆いすぎると背景を入れた意味がなくなるので、上限を決める。上限でも届かない写真は「この写真は背景に向きません」と事実で伝える
 
 **「作ってから気づいて直す」のが一番高くつく箇所**なので、背景を適用する前にこの仕組みを先に作る。
+
+### iOS で踏んではいけない落とし穴（2026-10-30 調査、一次情報で確認済み）
+
+WebKit のソースコードと MDN の互換データを直接読んで確認したもの。**どれも「黙って壊れる」種類**なので、知らずに書くと気づけない。
+
+| 項目 | 事実 | どうするか |
+|---|---|---|
+| **WebP の書き出し** | **iOS Safari は `canvas.toBlob` で WebP を出力できない。**しかも仕様上、未対応の形式を要求すると**エラーにならず黙って PNG を返す**。写真の PNG は JPEG の数倍のサイズになる | **JPEG を使う**（`toBlob(cb, 'image/jpeg', 0.82)`）。WebP を試すなら `blob.type` を必ず検査する |
+| **IndexedDB に Blob** | **プライベートブラウズでは WebKit が意図的にエラーを返す**（`Error preparing Blob/File data to be stored in object store`）。仕様的な制約でバグではない | **Blob を直接入れず `{ bytes: ArrayBuffer, type: string }` で保存する。** 読み出し時に `new Blob([bytes], {type})` で組み立てる |
+| **`background-attachment: fixed`** | MDN の互換データに「**iOS では認識されるが効果がない**」と明記（WebKit bug 275247） | 使わない。`position: fixed; inset: 0` の背景専用レイヤーにする。負の `z-index` は使わず、本文側に `z-index: 1` を与える |
+| **canvas の面積上限** | 16,777,216px（4096×4096相当）を超えると例外。最近のiPhone写真 4000×3000 = 12,000,000px は範囲内 | 縮小用 canvas は上限内に収める |
+| **canvas のメモリ上限** | 別枠で合計上限がある（報告値 224〜448MB、iOS版で変動）。参照を切ってもすぐには解放されない | 縮小用 canvas は**1個だけ使い回し、処理後に `canvas.width = canvas.height = 1` にして解放する** |
+| **EXIF の回転** | WebKit は `drawImage` で **EXIF の回転を自動適用する**（他ブラウザと挙動が違う）。自分でも回転させると**二重に回る** | `createImageBitmap(file, { imageOrientation: 'from-image' })` を明示し、**実機で Orientation=6 の画像を通して確認する** |
+| **`capture` 属性** | 付けると**選択メニューを飛ばして直接カメラが開く**（フォトライブラリが選べなくなる） | 背景は既存の写真から選ぶので**付けない** |
+| **`navigator.storage.estimate()`** | **iOS 17 以降にしか存在しない。** 非現実的な値を返すという報告もある | 存在チェックと `try/catch` を入れ、**参考表示に留める**。実際の限界は `QuotaExceededError` で扱う |
+| **表示方法** | data URL は base64 で約33%増え、巨大な文字列が常駐する | `URL.createObjectURL` を使い、**差し替え時に必ず `revokeObjectURL` する** |
+
+EXIF については朗報が1つ。**canvas を通した時点で位置情報は自動的に落ちる**（画素から新規にエンコードするため）。別途 EXIF 除去を書く必要はない。ただし ICC プロファイルも落ちるので、Display P3 の写真は色がわずかに変わる。
 
 ## 5. やらないこと
 
