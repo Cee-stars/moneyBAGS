@@ -8,14 +8,35 @@
   依存パッケージは使わない。必要なのは put / getAll / delete だけ。
 */
 
-import type { CurrencyCode } from "./money";
+import type { CurrencyCode } from "./money.ts";
+import { parseStoredImage, type StoredImage } from "./image.ts";
 
 export const DB_NAME = "moneybags";
-export const DB_VERSION = 1;
+/*
+  2 で image ストアを足した（背景写真）。
+  上げるときは onupgradeneeded が「無いものだけ作る」形になっているか確かめる。
+  version 1 のまま使っている端末からも、既存の txn / settings はそのまま残る。
+*/
+export const DB_VERSION = 2;
 
 export const STORE = {
   txn: "txn",
   settings: "settings",
+  image: "image",
+} as const;
+
+/*
+  設定の鍵。背景まわりは複数のファイルから読むので、文字列を2箇所に書かない。
+  （budgetMinor / lastBackupAt は先に文字列で書かれているのでそのままにしてある）
+*/
+export const SETTING_KEY = {
+  flowerFrame: "flowerFrame",
+  background: "background",
+} as const;
+
+/** 画像の鍵。背景は1枚だけなので固定の id を使う（差し替えは上書き）。 */
+export const IMAGE_ID = {
+  background: "background",
 } as const;
 
 export type Txn = {
@@ -54,6 +75,14 @@ export function openDB(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(STORE.settings)) {
         db.createObjectStore(STORE.settings, { keyPath: "key" });
+      }
+      /*
+        画像は settings と別のストアにする。設定は全件読み（getAllSettings）を
+        バックアップでも画面でも使うので、そこに数百KBの ArrayBuffer を混ぜると
+        設定を1つ読むたびに写真まで読むことになる。
+      */
+      if (!db.objectStoreNames.contains(STORE.image)) {
+        db.createObjectStore(STORE.image, { keyPath: "id" });
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -111,6 +140,26 @@ export const setSetting = (key: string, value: unknown) =>
 
 export const getAllSettings = () =>
   run<SettingsRow[]>(STORE.settings, "readonly", (s) => s.getAll());
+
+/* ---- 画像 ------------------------------------------------------------
+  Blob を直接入れない。プライベートブラウズでは WebKit が意図的にエラーを返すので、
+  { bytes: ArrayBuffer, type, width, height } の形で入れて、表示のときだけ
+  Blob に組み立てる（lib/image.ts の storedImageToBlob）。
+*/
+
+export type ImageRow = StoredImage & { id: string };
+
+export const putImage = (id: string, image: StoredImage) =>
+  run(STORE.image, "readwrite", (s) => s.put({ id, ...image }));
+
+export const deleteImage = (id: string) =>
+  run(STORE.image, "readwrite", (s) => s.delete(id));
+
+/** 形が違う行（古い保存・壊れた行）は null。呼び出し側は「写真なし」で動く。 */
+export async function getImage(id: string): Promise<StoredImage | null> {
+  const row = await run<ImageRow | undefined>(STORE.image, "readonly", (s) => s.get(id));
+  return row === undefined ? null : parseStoredImage(row);
+}
 
 export function newId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Background from "./background";
 import "./globals.css";
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "/moneyBAGS";
@@ -44,9 +45,18 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html:
-              'try{var t=localStorage.getItem("mb.textSize");if(t==="large"||t==="xlarge"){document.documentElement.dataset.text=t}}catch(e){}',
+              'try{var t=localStorage.getItem("mb.textSize");if(t==="large"||t==="xlarge"){document.documentElement.dataset.text=t}' +
+              // 花の枠は既定オン。オフにしている人の画面で最初の1フレームだけ
+              // 花が出るのを防ぐ（正は IndexedDB 側 → app/background.tsx）。
+              'if(localStorage.getItem("mb.flower")==="off"){document.documentElement.dataset.flower="off"}}catch(e){}',
           }}
         />
+        {/*
+          背景の3枚（写真・覆い・花の枠）。全画面に出す（本人の決定）。
+          本文より前に置くのは、DOM の順番で重なりを決めているため
+          （負の z-index を使わない）。詳細は app/background.tsx
+        */}
+        <Background />
         {children}
       </body>
     </html>

@@ -133,6 +133,84 @@ ol {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  /*
+    背景の3枚（.bg-photo / .bg-scrim / .bg-decor）より手前に出す。
+    背景側に負の z-index を使わない代わりに、本文側を 1 に上げる
+    （docs/PLAN.md §4.9 の表「background-attachment: fixed」の行）。
+  */
+  position: relative;
+  z-index: 1;
+}
+
+/* ---- 背景のレイヤー（app/background.tsx） ----------------------------
+
+   3枚とも position: fixed; inset: 0; z-index: 0。前後は DOM の順番で決める。
+   ・background-attachment: fixed は iOS で効かないので使わない
+   ・負の z-index は使わない（背景の上下に余白が出る報告がある）
+   ・この要素の祖先に transform / filter / will-change を付けない
+     （position: fixed の基準を作ってしまい、背景が本文と一緒に動く）
+   ・100vh ではなく inset: 0。アドレスバーの出入りでずれない
+*/
+/*
+  写真がないときの既定値。app/background.tsx が写真を敷くとき、
+  計算した文字色を :root のインラインスタイルで上書きする。
+  ここに既定を置いておくのは、万一上書きが来ないときに
+  var() が解決できず文字色が消えるのを防ぐため。
+*/
+:root {
+  --scrim-ink: #19222a;
+}
+
+.bg-photo,
+.bg-scrim,
+.bg-decor {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  /* タップを一切奪わない。テンキーの上に透明な板を敷かない */
+  pointer-events: none;
+}
+
+.bg-photo {
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+/*
+  花の枠の容器。position + z-index で独自の重なり文脈を作るのが目的
+  （isolation は念のための二重化）。flower-frame.tsx の中は z-index: -1 だが、
+  ここで閉じるので「写真と覆いより手前・本文より後ろ」に収まる。
+*/
+.bg-decor {
+  isolation: isolate;
+}
+
+:root[data-flower="off"] .bg-decor {
+  display: none;
+}
+
+/*
+  写真を敷いているときだけ、**不透明なカードの外にある文字**を
+  計算した文字色（--scrim-ink）に替える。覆いの濃さと組で 4.5:1 を保証した色。
+  カードやボタンは --surface が不透明に乗っているので、元の文字色のままにする。
+*/
+:root[data-bg="photo"] .wrap > header,
+:root[data-bg="photo"] .wrap > header .h1,
+:root[data-bg="photo"] .wrap > header .sub,
+:root[data-bg="photo"] .wrap > p,
+:root[data-bg="photo"] .wrap > .sub,
+:root[data-bg="photo"] .wrap > .note,
+:root[data-bg="photo"] .wrap > .link {
+  color: var(--scrim-ink);
+}
+
+/*
+  リンクは色だけで「押せる」を示している（WCAG 1.4.1）。文字色を覆いに
+  合わせて替えるとその手がかりが消えるので、写真のときだけ下線を足す。
+*/
+:root[data-bg="photo"] .wrap > .link {
+  text-decoration: underline;
 }
 
 .card {
